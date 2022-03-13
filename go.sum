@@ -1,10 +1,10 @@
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/apple/foundationdb/bindings/go v0.0.0-20220225233552-7d7762ba77d3 h1:S/xzFVCu6SltS0T8JIHvdOy28DDNWQu0B/5gFGs0JMk=
-github.com/apple/foundationdb/bindings/go v0.0.0-20220225233552-7d7762ba77d3/go.mod h1:w63jdZTFCtvdjsUj5yrdKgjxaAD5uXQX6hJ7EaiLFRs=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pelletier/go-toml v1.6.0/go.mod h1:5N711Q9dKgbdkxHL+MEfF31hpT7l0S0s/t2kKREewys=
 github.com/peterbourgon/ff/v3 v3.1.2 h1:0GNhbRhO9yHA4CC27ymskOsuRpmX0YQxwxM9UPiP6JM=
 github.com/peterbourgon/ff/v3 v3.1.2/go.mod h1:XNJLY8EIl6MjMVjBS4F0+G0LYoAqs0DTa4rmHHukKDE=
+github.com/vrischmann/foundationdb/bindings/go v0.0.0-20220313231739-3be5b4d440e3 h1:zolA31mUS4oAZe3morsaxUKcv67bUUoGmh8HTHT3E+w=
+github.com/vrischmann/foundationdb/bindings/go v0.0.0-20220313231739-3be5b4d440e3/go.mod h1:oa0mgIm7iKpHL5auq3W1ONxavhb0g6uIXxJwq07lDTk=
 golang.org/x/sync v0.0.0-20210220032951-036812b2e83c h1:5KslGYwFpkhGh+Q16bwMP3cOontH8FOep7tGV86Y7SQ=
 golang.org/x/sync v0.0.0-20210220032951-036812b2e83c/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
