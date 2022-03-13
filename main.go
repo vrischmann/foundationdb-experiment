@@ -15,21 +15,21 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func incrementCounter(db fdb.Database, key string) error {
-	tx, err := db.CreateTransaction()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var buf [8]byte
-	binary.LittleEndian.PutUint64(buf[:], 1)
+func executeWithRetry[T any](tx fdb.Transaction, fn func(tx fdb.Transaction) (T, error)) (T, error) {
+	var (
+		ret T
+		err error
+	)
 
 	for {
-		tx.Add(fdb.Key(key), buf[:])
+		ret, err = fn(tx)
+		if err != nil {
+			break
+		}
 
 		f := tx.Commit()
 
-		err := f.Get()
+		err = f.Get()
 		if err == nil {
 			break
 		}
@@ -42,11 +42,28 @@ func incrementCounter(db fdb.Database, key string) error {
 		}
 
 		if err != nil {
-			return err
+			break
 		}
 	}
 
-	return nil
+	return ret, err
+}
+
+func incrementCounter(db fdb.Database, key string) error {
+	tx, err := db.CreateTransaction()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], 1)
+
+	_, err = executeWithRetry(tx, func(tx fdb.Transaction) (struct{}, error) {
+		tx.Add(fdb.Key(key), buf[:])
+		return struct{}{}, nil
+	})
+
+	return err
 }
 
 type rootCmdConfig struct {
@@ -79,6 +96,9 @@ func (c *rootCmdConfig) Exec(ctx context.Context, args []string) error {
 
 type incCounterTestCmdConfig struct {
 	root *rootCmdConfig
+
+	nbGoroutines int
+	nbIterations int
 }
 
 func newIncCounterTestCmd(root *rootCmdConfig) *ffcli.Command {
@@ -87,6 +107,8 @@ func newIncCounterTestCmd(root *rootCmdConfig) *ffcli.Command {
 	}
 
 	fs := flag.NewFlagSet("fdbtest inc-counter-test", flag.ExitOnError)
+	fs.IntVar(&cfg.nbGoroutines, "nb-goroutines", 1, "The number of goroutines to run")
+	fs.IntVar(&cfg.nbIterations, "nb-iter", 1, "The number of iterations per goroutine to run")
 	root.RegisterFlags(fs)
 
 	return &ffcli.Command{
@@ -106,9 +128,9 @@ func (c *incCounterTestCmdConfig) Exec(ctx context.Context, args []string) error
 	key := args[0]
 
 	var eg errgroup.Group
-	for i := 0; i < 10; i++ {
+	for i := 0; i < c.nbGoroutines; i++ {
 		eg.Go(func() error {
-			for i := 0; i < 200000; i++ {
+			for i := 0; i < c.nbIterations; i++ {
 				err := incrementCounter(c.root.db, key)
 				if err != nil {
 					return err
@@ -121,14 +143,77 @@ func (c *incCounterTestCmdConfig) Exec(ctx context.Context, args []string) error
 	return eg.Wait()
 }
 
+type getCmdConfig struct {
+	root *rootCmdConfig
+
+	decodeAsInt bool
+}
+
+func newGetCmd(root *rootCmdConfig) *ffcli.Command {
+	cfg := &getCmdConfig{
+		root: root,
+	}
+
+	fs := flag.NewFlagSet("fdbtest get", flag.ExitOnError)
+	fs.BoolVar(&cfg.decodeAsInt, "as-int", false, "Decode the value as an 8 byte integer")
+	root.RegisterFlags(fs)
+
+	return &ffcli.Command{
+		Name:       "get",
+		ShortUsage: "get [flags] <key>",
+		FlagSet:    fs,
+		Exec:       cfg.Exec,
+	}
+}
+
+func (c *getCmdConfig) Exec(ctx context.Context, args []string) error {
+	if len(args) < 1 {
+		fmt.Printf("Missing `key` argument\n\n")
+		return flag.ErrHelp
+	}
+
+	key := args[0]
+
+	tx, err := c.root.db.CreateTransaction()
+	if err != nil {
+		return err
+	}
+
+	if c.decodeAsInt {
+		n, err := executeWithRetry(tx, func(tx fdb.Transaction) (int, error) {
+			data := tx.Get(fdb.Key(key)).MustGet()
+			return int(binary.LittleEndian.Uint64(data)), nil
+		})
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("integer value: %d\n", n)
+	} else {
+		data, err := executeWithRetry(tx, func(tx fdb.Transaction) (string, error) {
+			data := tx.Get(fdb.Key(key)).MustGet()
+			return string(data), nil
+		})
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("byte string value: %q\n", data)
+	}
+
+	return nil
+}
+
 func main() {
 	var (
 		rootCmd, root     = newRootCmd()
 		incCounterTestCmd = newIncCounterTestCmd(root)
+		getCmd            = newGetCmd(root)
 	)
 
 	rootCmd.Subcommands = []*ffcli.Command{
 		incCounterTestCmd,
+		getCmd,
 	}
 
 	if err := rootCmd.Parse(os.Args[1:]); err != nil {

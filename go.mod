@@ -1,6 +1,6 @@
 module go.rischmann.fr/fdbtest
 
-go 1.17
+go 1.18
 
 require (
 	github.com/apple/foundationdb/bindings/go v0.0.0-20220225233552-7d7762ba77d3
