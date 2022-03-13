@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -15,50 +14,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func executeWithRetry[T any](tx fdb.Transaction, fn func(tx fdb.Transaction) (T, error)) (T, error) {
-	var (
-		ret T
-		err error
-	)
-
-	for {
-		ret, err = fn(tx)
-		if err != nil {
-			break
-		}
-
-		f := tx.Commit()
-
-		err = f.Get()
-		if err == nil {
-			break
-		}
-
-		log.Printf("commit failed, err: %v", err)
-
-		var fdbErr fdb.Error
-		if errors.Is(err, &fdbErr) {
-			err = tx.OnError(fdbErr).Get()
-		}
-
-		if err != nil {
-			break
-		}
-	}
-
-	return ret, err
-}
-
 func incrementCounter(db fdb.Database, key string) error {
-	tx, err := db.CreateTransaction()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	var buf [8]byte
 	binary.LittleEndian.PutUint64(buf[:], 1)
 
-	_, err = executeWithRetry(tx, func(tx fdb.Transaction) (struct{}, error) {
+	_, err := fdb.GenericTransact(db, func(tx fdb.Transaction) (struct{}, error) {
 		tx.Add(fdb.Key(key), buf[:])
 		return struct{}{}, nil
 	})
@@ -174,13 +134,8 @@ func (c *getCmdConfig) Exec(ctx context.Context, args []string) error {
 
 	key := args[0]
 
-	tx, err := c.root.db.CreateTransaction()
-	if err != nil {
-		return err
-	}
-
 	if c.decodeAsInt {
-		n, err := executeWithRetry(tx, func(tx fdb.Transaction) (int, error) {
+		n, err := fdb.GenericTransact(c.root.db, func(tx fdb.Transaction) (int, error) {
 			data := tx.Get(fdb.Key(key)).MustGet()
 			return int(binary.LittleEndian.Uint64(data)), nil
 		})
@@ -190,7 +145,7 @@ func (c *getCmdConfig) Exec(ctx context.Context, args []string) error {
 
 		fmt.Printf("integer value: %d\n", n)
 	} else {
-		data, err := executeWithRetry(tx, func(tx fdb.Transaction) (string, error) {
+		data, err := fdb.GenericTransact(c.root.db, func(tx fdb.Transaction) (string, error) {
 			data := tx.Get(fdb.Key(key)).MustGet()
 			return string(data), nil
 		})
