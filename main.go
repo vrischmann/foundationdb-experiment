@@ -98,11 +98,18 @@ func newIncCounterTestCmd(root *rootCmdConfig) *ffcli.Command {
 }
 
 func (c *incCounterTestCmdConfig) Exec(ctx context.Context, args []string) error {
+	if len(args) < 1 {
+		fmt.Printf("Missing `key` argument\n\n")
+		return flag.ErrHelp
+	}
+
+	key := args[0]
+
 	var eg errgroup.Group
 	for i := 0; i < 10; i++ {
 		eg.Go(func() error {
 			for i := 0; i < 200000; i++ {
-				err := incrementCounter(c.root.db, "vincent")
+				err := incrementCounter(c.root.db, key)
 				if err != nil {
 					return err
 				}
