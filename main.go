@@ -96,6 +96,9 @@ func (c *rootCmdConfig) Exec(ctx context.Context, args []string) error {
 
 type incCounterTestCmdConfig struct {
 	root *rootCmdConfig
+
+	nbGoroutines int
+	nbIterations int
 }
 
 func newIncCounterTestCmd(root *rootCmdConfig) *ffcli.Command {
@@ -104,6 +107,8 @@ func newIncCounterTestCmd(root *rootCmdConfig) *ffcli.Command {
 	}
 
 	fs := flag.NewFlagSet("fdbtest inc-counter-test", flag.ExitOnError)
+	fs.IntVar(&cfg.nbGoroutines, "nb-goroutines", 1, "The number of goroutines to run")
+	fs.IntVar(&cfg.nbIterations, "nb-iter", 1, "The number of iterations per goroutine to run")
 	root.RegisterFlags(fs)
 
 	return &ffcli.Command{
@@ -123,9 +128,9 @@ func (c *incCounterTestCmdConfig) Exec(ctx context.Context, args []string) error
 	key := args[0]
 
 	var eg errgroup.Group
-	for i := 0; i < 10; i++ {
+	for i := 0; i < c.nbGoroutines; i++ {
 		eg.Go(func() error {
-			for i := 0; i < 200000; i++ {
+			for i := 0; i < c.nbIterations; i++ {
 				err := incrementCounter(c.root.db, key)
 				if err != nil {
 					return err
