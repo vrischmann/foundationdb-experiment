@@ -15,6 +15,40 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+func executeWithRetry[T any](tx fdb.Transaction, fn func(tx fdb.Transaction) (T, error)) (T, error) {
+	var (
+		ret T
+		err error
+	)
+
+	for {
+		ret, err = fn(tx)
+		if err != nil {
+			break
+		}
+
+		f := tx.Commit()
+
+		err = f.Get()
+		if err == nil {
+			break
+		}
+
+		log.Printf("commit failed, err: %v", err)
+
+		var fdbErr fdb.Error
+		if errors.Is(err, &fdbErr) {
+			err = tx.OnError(fdbErr).Get()
+		}
+
+		if err != nil {
+			break
+		}
+	}
+
+	return ret, err
+}
+
 func incrementCounter(db fdb.Database, key string) error {
 	tx, err := db.CreateTransaction()
 	if err != nil {
