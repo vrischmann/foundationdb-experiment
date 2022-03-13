@@ -143,14 +143,77 @@ func (c *incCounterTestCmdConfig) Exec(ctx context.Context, args []string) error
 	return eg.Wait()
 }
 
+type getCmdConfig struct {
+	root *rootCmdConfig
+
+	decodeAsInt bool
+}
+
+func newGetCmd(root *rootCmdConfig) *ffcli.Command {
+	cfg := &getCmdConfig{
+		root: root,
+	}
+
+	fs := flag.NewFlagSet("fdbtest get", flag.ExitOnError)
+	fs.BoolVar(&cfg.decodeAsInt, "as-int", false, "Decode the value as an 8 byte integer")
+	root.RegisterFlags(fs)
+
+	return &ffcli.Command{
+		Name:       "get",
+		ShortUsage: "get [flags] <key>",
+		FlagSet:    fs,
+		Exec:       cfg.Exec,
+	}
+}
+
+func (c *getCmdConfig) Exec(ctx context.Context, args []string) error {
+	if len(args) < 1 {
+		fmt.Printf("Missing `key` argument\n\n")
+		return flag.ErrHelp
+	}
+
+	key := args[0]
+
+	tx, err := c.root.db.CreateTransaction()
+	if err != nil {
+		return err
+	}
+
+	if c.decodeAsInt {
+		n, err := executeWithRetry(tx, func(tx fdb.Transaction) (int, error) {
+			data := tx.Get(fdb.Key(key)).MustGet()
+			return int(binary.LittleEndian.Uint64(data)), nil
+		})
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("integer value: %d\n", n)
+	} else {
+		data, err := executeWithRetry(tx, func(tx fdb.Transaction) (string, error) {
+			data := tx.Get(fdb.Key(key)).MustGet()
+			return string(data), nil
+		})
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("byte string value: %q\n", data)
+	}
+
+	return nil
+}
+
 func main() {
 	var (
 		rootCmd, root     = newRootCmd()
 		incCounterTestCmd = newIncCounterTestCmd(root)
+		getCmd            = newGetCmd(root)
 	)
 
 	rootCmd.Subcommands = []*ffcli.Command{
 		incCounterTestCmd,
+		getCmd,
 	}
 
 	if err := rootCmd.Parse(os.Args[1:]); err != nil {
