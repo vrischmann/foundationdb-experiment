@@ -9,3 +9,5 @@ require (
 )
 
 require golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
+
+replace github.com/apple/foundationdb/bindings/go => github.com/vrischmann/foundationdb/bindings/go v0.0.0-20220313231739-3be5b4d440e3
