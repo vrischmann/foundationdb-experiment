@@ -58,29 +58,12 @@ func incrementCounter(db fdb.Database, key string) error {
 	var buf [8]byte
 	binary.LittleEndian.PutUint64(buf[:], 1)
 
-	for {
+	_, err = executeWithRetry(tx, func(tx fdb.Transaction) (struct{}, error) {
 		tx.Add(fdb.Key(key), buf[:])
+		return struct{}{}, nil
+	})
 
-		f := tx.Commit()
-
-		err := f.Get()
-		if err == nil {
-			break
-		}
-
-		log.Printf("commit failed, err: %v", err)
-
-		var fdbErr fdb.Error
-		if errors.Is(err, &fdbErr) {
-			err = tx.OnError(fdbErr).Get()
-		}
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return err
 }
 
 type rootCmdConfig struct {
